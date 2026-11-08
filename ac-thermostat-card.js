@@ -243,16 +243,6 @@ export class AcThermostatCard extends HTMLElement {
     await control.updateComplete;
     if (card !== this._card || generation !== this._presentationGeneration) return;
 
-    // Our card mounts asynchronously (loadCardHelpers + several updateComplete
-    // awaits), which apparently lets the control's own size-bucket detection
-    // measure a transiently wider box than a synchronously-mounted native
-    // card gets — reliably landing one bucket larger ("lg" with +/- buttons
-    // instead of "md") even with identical ha-card width and feature count.
-    // Cap to the same ratio a 3-feature sibling card's control measures
-    // (245px control / 372.9px card ≈ 65.7%) so this stays visually
-    // consistent with the other AC cards instead of chasing the real cause.
-    control.style.maxWidth = "65.7%";
-
     // Surgical override of the native render, scoped to this control
     // instance only. Mirrors heating-pulse-controller-v2's pattern: fake the
     // rendered stateObj for the duration of one render() call so the arc
@@ -300,16 +290,11 @@ export class AcThermostatCard extends HTMLElement {
     control.requestUpdate();
   }
 
-  // The native card's own getCardSize/getGridOptions don't know about the
-  // extra vane row we append into its ha-card — without the +1 here, the
-  // sections grid allocates too little height and the real content silently
-  // overflows past its slot into the card below.
   getCardSize() {
-    return (this._card?.getCardSize?.() ?? 5) + 1;
+    return this._card?.getCardSize?.() ?? 5;
   }
   getGridOptions() {
-    const base = this._card?.getGridOptions?.() ?? { columns: 6, rows: 4 };
-    return { ...base, rows: base.rows + 1 };
+    return this._card?.getGridOptions?.() ?? { columns: 6, rows: 4 };
   }
   static getStubConfig(hass) {
     const entity = Object.values(hass.states).find(
