@@ -9,6 +9,11 @@
 const FAN_MODE_ORDER = ["auto", "quiet", "low", "medium", "middle", "high"];
 const FAN_MODE_LABELS = { auto: "Auto", quiet: "1", low: "2", medium: "3", middle: "4", high: "5" };
 
+// Same icon HA's native climate-swing-modes feature uses (mdi:arrow-up-down),
+// grabbed from the live rendered feature rather than guessed.
+const VANE_ICON_PATH =
+  "M6 14H9L5 18L1 14H4C4 11.3 5.7 6.6 11 6.1V8.1C7.6 8.6 6 11.9 6 14M20 14C20 11.3 18.3 6.6 13 6.1V8.1C16.4 8.7 18 11.9 18 14H15L19 18L23 14H20Z";
+
 const COLORS = {
   orange: "var(--deep-orange-color, #ff6f22)",
   teal: "var(--teal-color, #2dd4bf)",
@@ -89,7 +94,6 @@ export class AcThermostatCard extends HTMLElement {
         features: this._config.features ?? [
           { type: "climate-fan-modes", style: "dropdown" },
           { type: "climate-hvac-modes" },
-          { type: "climate-swing-modes", style: "dropdown" },
         ],
       });
       if (generation !== this._generation) return;
@@ -132,6 +136,51 @@ export class AcThermostatCard extends HTMLElement {
     const generation = (this._presentationGeneration = (this._presentationGeneration || 0) + 1);
     this._presentationReady = this._patchLabelAndGlow(presentation, generation);
     this._fanOrderReady = this._patchFanModeOrder(generation);
+    if (this._config.vertical_vane_entity) this._vaneRowReady = this._mountVaneRow(generation);
+  }
+
+  // Native climate swing_mode on this platform only has 2 real states
+  // (off/vertical) — the actual 7-position vane control lives on a separate
+  // select entity. Mount a real ha-control-select-menu (the same component
+  // HA's own climate-fan-modes feature uses) as a light-DOM child of ha-card,
+  // so it renders inside the same card body via ha-card's catch-all <slot>,
+  // instead of a second bordered card. Built once, then kept in sync.
+  async _mountVaneRow(generation) {
+    const card = this._card;
+    await card.updateComplete;
+    if (card !== this._card || generation !== this._presentationGeneration) return;
+    const haCard = card.shadowRoot?.querySelector("ha-card");
+    if (!haCard) return;
+
+    const entity = this._config.vertical_vane_entity;
+    const vaneState = this._hass.states[entity];
+    if (!vaneState) return;
+
+    if (!this._vaneMenu) {
+      this._vaneMenu = document.createElement("ha-control-select-menu");
+      this._vaneMenu.setAttribute("show-arrow", "");
+      this._vaneMenu.setAttribute("hide-label", "");
+      const icon = document.createElement("ha-svg-icon");
+      icon.setAttribute("slot", "icon");
+      icon.path = VANE_ICON_PATH;
+      this._vaneMenu.appendChild(icon);
+      this._vaneMenu.addEventListener("value-changed", (ev) => {
+        this._hass.callService("select", "select_option", { entity_id: entity, option: ev.detail.value });
+      });
+      this._vaneMenu.style.width = "100%";
+      const wrapper = document.createElement("div");
+      // ha-card is flex column/align-items:center, so a plain light-DOM child
+      // shrinks to content width like ours did — stretch it like the native
+      // hui-card-features wrapper implicitly gets from its own host CSS.
+      wrapper.style.cssText = "padding: 0 12px 12px; align-self: stretch; box-sizing: border-box;";
+      wrapper.appendChild(this._vaneMenu);
+      haCard.appendChild(wrapper);
+    }
+
+    this._vaneMenu.hass = this._hass;
+    this._vaneMenu.options = vaneState.attributes.options.map((o) => ({ label: o, value: o }));
+    this._vaneMenu.value = vaneState.state;
+    this._vaneMenu.disabled = ["unavailable", "unknown"].includes(vaneState.state);
   }
 
   // The native fan-modes feature always redraws its options list from
