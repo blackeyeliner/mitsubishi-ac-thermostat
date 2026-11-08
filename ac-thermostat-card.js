@@ -78,7 +78,13 @@ export function resolveAcPresentation(state, subModeState, autoSubModeState) {
   if (action === "cooling") return { color: COLORS.ice, label: null, glow: true };
   if (action === "drying") return { color: COLORS.teal, label: null, glow: true };
   if (action === "fan") return { color: COLORS.green, label: null, glow: true };
-  return { color: COLORS.grey, label: null, glow: false }; // idle / off
+  // Idle while heat/cool mode is selected: the unit is on and satisfied,
+  // not off. Green matches warmup/preheat/standby's "operating, not
+  // actively delivering" meaning; grey stays reserved for mode off.
+  if (state.state === "heat" || state.state === "cool") {
+    return { color: COLORS.green, label: null, glow: false };
+  }
+  return { color: COLORS.grey, label: null, glow: false }; // off / other
 }
 
 await customElements.whenDefined("home-assistant");
@@ -132,19 +138,20 @@ export class AcThermostatCard extends HTMLElement {
     this._presentation = presentation;
 
     // Recolor whichever mode button is actually active; leave the others at
-    // native defaults so off/fan/dry/cool keep their normal HA coloring
-    // except where we deliberately want teal for cool+dry and green for fan.
+    // native defaults so off/fan/dry keep their normal HA coloring except
+    // where we deliberately want teal for dry and green for fan.
     const modeColorOverrides = {
-      cool: COLORS.ice,
       dry: COLORS.teal,
       fan_only: COLORS.green,
     };
     for (const [mode, color] of Object.entries(modeColorOverrides)) {
       this._card.style.setProperty(`--state-climate-${mode}-color`, color);
     }
-    // heat/auto follow the resolved presentation color (dynamic for auto,
-    // always orange-when-heating for heat — matches native default anyway).
+    // heat/cool/auto all follow the resolved presentation color — cool must
+    // be dynamic too (not a static blue) so idle-while-cooling can render
+    // green instead of blue, same as idle-while-heating.
     this._card.style.setProperty("--state-climate-heat-color", presentation.color);
+    this._card.style.setProperty("--state-climate-cool-color", presentation.color);
     this._card.style.setProperty("--state-climate-auto-color", presentation.color);
 
     const generation = (this._presentationGeneration = (this._presentationGeneration || 0) + 1);

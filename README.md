@@ -48,7 +48,8 @@ any other UI would.
   | State | Color | Label override |
   |---|---|---|
   | `hvac_action: heating` | orange | — (native) |
-  | `hvac_action: cooling` / `cool` mode | blue | — (native) |
+  | `hvac_action: cooling` | blue | — (native) |
+  | `heat` or `cool` mode, idle (satisfied, waiting) | green | — (native) |
   | `dry` mode / `hvac_action: drying` | teal | — (native) |
   | `fan_only` mode / `hvac_action: fan` | green | — (native) |
   | `sub_mode: DEFROST` | blue | "Defrost" |
@@ -58,12 +59,14 @@ any other UI would.
   | `auto_sub_mode: AUTO_HEAT` | orange | "Heating" |
   | `auto_sub_mode: AUTO_COOL` | blue | "Cooling" |
   | `auto_sub_mode: AUTO_LEADER` / `AUTO_ACTIVE` | grey | "Auto (Leader)" / "Auto (Active)" |
-  | unavailable / unknown | grey | — |
+  | unavailable / unknown, or mode `off` | grey | — |
 
-  Green marks warmup/preheat/standby: the unit is actively operating but
-  not yet delivering heat or cold. Grey is reserved for genuinely off/idle
-  states. Defrost shares the cooling blue deliberately — the unit is
-  reverse-cycling, same as active cooling, just for a different reason.
+  Green marks "the unit is on and operating but not actively delivering
+  heat or cold" — that covers warmup/preheat/standby, and plain idle
+  while heat or cool mode is selected (setpoint reached, waiting). Grey is
+  reserved for mode `off` and unavailable/unknown. Defrost shares the
+  cooling blue deliberately — the unit is reverse-cycling, same as active
+  cooling, just for a different reason.
 
 - **Reorders and relabels the fan speed dropdown** to `Auto, 1, 2, 3, 4, 5`
   — the same numbering printed on the physical remote — while the actual
