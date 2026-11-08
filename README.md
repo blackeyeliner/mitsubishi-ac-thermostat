@@ -2,9 +2,8 @@
 
 A Home Assistant Lovelace card for Mitsubishi heat pumps running the
 [`echavet/MitsubishiCN105ESPHome`](https://github.com/echavet/MitsubishiCN105ESPHome)
-ESPHome component. It wraps the native `thermostat` card rather than
-replacing it, and adds the CN105-specific presentation and controls that
-component doesn't ship with.
+ESPHome component. It wraps the native `thermostat` card and adds the
+CN105-specific presentation and controls that component doesn't ship with.
 
 | Heating | Cooling | Defrost |
 |---|---|---|
@@ -17,34 +16,33 @@ correct modes, temperature, and `hvac_action` — but a few things it reports
 don't come through in the stock `thermostat` card, or in a form a human
 wants to read at a glance:
 
-- **Sub-modes report as sensors, not as card state.** CN105 exposes two
-  diagnostic text sensors, `sub_mode` (`NORMAL` / `DEFROST` / `WARMUP` /
+- **Sub-modes only exist as separate diagnostic sensors.** CN105 exposes
+  two text sensors, `sub_mode` (`NORMAL` / `DEFROST` / `WARMUP` /
   `PREHEAT` / `STANDBY`) and `auto_sub_mode` (`AUTO_HEAT` / `AUTO_COOL` /
-  `AUTO_LEADER` / `AUTO_ACTIVE` / ...), that the native card has no way to
-  fold into its own coloring or label. Defrosting looks identical to
-  "heating normally" unless you go check a separate sensor.
-- **Fan speed labels are the component's internal enum, not what's printed
-  on the remote.** The native dropdown shows `auto` / `quiet` / `low` /
-  `medium` / `middle` / `high` in ESPHome's own declaration order — not the
-  unit's actual 1–5 speed numbering, and `middle` vs `medium` reads as a
-  typo rather than two different speeds.
-- **Vertical vane position has no UI at all in the stock setup.** CN105
-  exposes it as a `select` entity with its own 7 options, but nothing
-  surfaces it inside the thermostat card itself — it would otherwise need a
-  second, separate card underneath.
+  `AUTO_LEADER` / `AUTO_ACTIVE` / ...), but the native card has no way to
+  fold them into its own coloring or label. Defrosting looks identical to
+  normal heating unless you go check a separate sensor.
+- **Fan speed labels follow the component's internal enum order and
+  naming.** The native dropdown shows `auto` / `quiet` / `low` / `medium`
+  / `middle` / `high` in ESPHome's declaration order, instead of the
+  unit's actual 1–5 speed numbering printed on the remote, and `middle`
+  vs `medium` reads as a typo rather than two different speeds.
+- **Vertical vane position has no UI in the stock setup.** CN105 exposes
+  it as a `select` entity with its own 7 options, but nothing surfaces it
+  inside the thermostat card — it would otherwise need a second, separate
+  card underneath.
 
-This card fixes exactly those three things, without touching the real
-entity state anything else in Home Assistant sees: everything is read-only
-overrides of the native card's *presentation* for the one render cycle, plus
-a vane control that calls the entity's own `select.select_option` service
-like any other UI would.
+This card fixes those three things without touching the real entity state
+that the rest of Home Assistant sees: everything is a read-only override
+of the native card's presentation for one render cycle, plus a vane
+control that calls the entity's own `select.select_option` service like
+any other UI would.
 
 ## What it does
 
-- **Wraps `type: thermostat`** (via `helpers.createCardElement`) instead of
-  reimplementing it, so it keeps every native behavior (header toolbar,
-  more-info, size/grid behavior, theming) for free. See
-  [Architecture](#architecture) for why.
+- **Wraps `type: thermostat`** (via `helpers.createCardElement`), so it
+  keeps every native behavior (header toolbar, more-info, size/grid
+  behavior, theming) for free. See [Architecture](#architecture) for why.
 - **Colors and labels the dial from the real sub-mode sensors:**
 
   | State | Color | Label override |
@@ -62,20 +60,19 @@ like any other UI would.
   | `auto_sub_mode: AUTO_LEADER` / `AUTO_ACTIVE` | grey | "Auto (Leader)" / "Auto (Active)" |
   | unavailable / unknown | grey | — |
 
-  Green is used for "the unit is actively operating but not yet delivering
-  heat or cold" (warmup/preheat/standby) — grey is reserved for genuinely
-  off/idle, so a glance at the color never confuses "working" with "doing
-  nothing." Defrost shares the cooling blue deliberately: the unit is
-  reverse-cycling exactly like active cooling, just for a different reason.
+  Green marks warmup/preheat/standby: the unit is actively operating but
+  not yet delivering heat or cold. Grey is reserved for genuinely off/idle
+  states. Defrost shares the cooling blue deliberately — the unit is
+  reverse-cycling, same as active cooling, just for a different reason.
 
 - **Reorders and relabels the fan speed dropdown** to `Auto, 1, 2, 3, 4, 5`
   — the same numbering printed on the physical remote — while the actual
   service call underneath still sends CN105's real `fan_mode` string
   (`quiet`, `middle`, etc.). Nothing about the entity changes; only what's
   drawn in the dropdown.
-- **Adds a 7-position vertical vane control** inside the same card body
-  (not a second card), reusing HA's own `ha-control-select-menu` and swing
-  icon so it looks like a native feature row:
+- **Adds a 7-position vertical vane control** inside the same card body,
+  reusing HA's own `ha-control-select-menu` and swing icon so it looks
+  like a native feature row:
 
   `Auto, 1 - Up, 2, 3, 4, 5 - Down, Swing`
 
@@ -147,15 +144,13 @@ native card, patch presentation surgically, never fork the whole component.
   (`hui-thermostat-card` → `hui-card-features` → `hui-card-feature` →
   `hui-climate-fan-modes-card-feature` → `ha-control-select-menu`) relies on
   Home Assistant frontend internals, not a public API. A future HA frontend
-  refactor could silently break the fan-mode relabeling without an error.
+  refactor could break the fan-mode relabeling with no error raised.
 
 ## Scope
 
-Built for one household's [`echavet/MitsubishiCN105ESPHome`](https://github.com/echavet/MitsubishiCN105ESPHome)
-setup — `resolveAcPresentation()` matches that component's exact sub-mode
-strings (`DEFROST`, `AUTO_HEAT`, `WARMUP`, ...) and its fan/vane
-enum/glyph values. A different Mitsubishi integration, or a different
-vendor's component, won't get the sub-mode coloring or label fixes (it'll
-just render as a plain native thermostat card). Only exercised against
-this one installation so far — no support commitment beyond that, though
-issues/PRs are welcome.
+Built for [`echavet/MitsubishiCN105ESPHome`](https://github.com/echavet/MitsubishiCN105ESPHome):
+`resolveAcPresentation()` matches that component's exact sub-mode strings
+(`DEFROST`, `AUTO_HEAT`, `WARMUP`, ...) and its fan/vane enum/glyph
+values. A different Mitsubishi integration or vendor component falls back
+to a plain native thermostat card — the sub-mode coloring and label fixes
+are specific to CN105's own sensor vocabulary.
