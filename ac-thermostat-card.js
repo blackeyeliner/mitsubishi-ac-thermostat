@@ -85,6 +85,14 @@ export class AcThermostatCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    // Without this the host defaults to display:inline, which starves the
+    // native control's container-query width just enough to drop it from
+    // the "lg" size bucket to "md" — silently hiding its +/- step buttons.
+    // Must go through :host CSS, not this.style — custom element constructors
+    // are not allowed to add attributes (including `style`) to the host.
+    const hostStyle = document.createElement("style");
+    hostStyle.textContent = ":host { display: block; }";
+    this.shadowRoot.appendChild(hostStyle);
     this._generation = 0;
   }
 
@@ -110,11 +118,19 @@ export class AcThermostatCard extends HTMLElement {
       });
       if (generation !== this._generation) return;
       this._card = card;
-      this.shadowRoot.replaceChildren(card);
+      // Leave the :host style tag from the constructor alone — only replace
+      // previous card/error content.
+      for (const child of [...this.shadowRoot.children]) {
+        if (child.tagName !== "STYLE") child.remove();
+      }
+      this.shadowRoot.appendChild(card);
       if (this._hass) this.hass = this._hass;
     } catch (error) {
       if (generation !== this._generation) return;
-      this.shadowRoot.textContent = "Unable to load thermostat: " + error.message;
+      for (const child of [...this.shadowRoot.children]) {
+        if (child.tagName !== "STYLE") child.remove();
+      }
+      this.shadowRoot.appendChild(document.createTextNode("Unable to load thermostat: " + error.message));
     }
   }
 
