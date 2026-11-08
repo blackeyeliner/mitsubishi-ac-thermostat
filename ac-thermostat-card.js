@@ -306,11 +306,19 @@ export class AcThermostatCard extends HTMLElement {
     control.requestUpdate();
   }
 
+  // The native card's own getCardSize/getGridOptions are computed from its
+  // configured features alone — they don't know about the display:block fix
+  // (which bumps it into the taller "lg" container-query bucket, adding the
+  // +/- buttons) or the extra vane row we append into its ha-card. Without
+  // correcting for that, the sections grid allocates too little height and
+  // the real content silently overflows into whatever sits below (confirmed:
+  // measured 553px rendered vs 440px allocated at the native rows value).
   getCardSize() {
-    return this._card?.getCardSize?.() ?? 5;
+    return (this._card?.getCardSize?.() ?? 5) + 2;
   }
   getGridOptions() {
-    return this._card?.getGridOptions?.() ?? { columns: 6, rows: 4 };
+    const base = this._card?.getGridOptions?.() ?? { columns: 6, rows: 4 };
+    return { ...base, rows: base.rows + 2 };
   }
   static getStubConfig(hass) {
     const entity = Object.values(hass.states).find(
