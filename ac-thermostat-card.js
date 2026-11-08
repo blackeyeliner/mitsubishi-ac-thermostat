@@ -65,11 +65,13 @@ export function resolveAcPresentation(state, subModeState, autoSubModeState) {
     }
   }
 
-  // Transitional heat sub-phases: real heat isn't flowing yet, so no glow,
-  // but tell the truth about which phase it's in rather than saying "Heating".
-  if (subMode === "WARMUP") return { color: COLORS.grey, label: "Warmup", glow: false };
-  if (subMode === "PREHEAT") return { color: COLORS.grey, label: "Preheat", glow: false };
-  if (subMode === "STANDBY") return { color: COLORS.grey, label: "Standby", glow: false };
+  // Transitional heat sub-phases: all three are the unit actively operating
+  // (just not delivering heat yet), so grey (reserved for off/idle) would
+  // misrepresent them. Green distinguishes "working, not yet heating" from
+  // orange ("actually heating") and grey ("truly idle/off").
+  if (subMode === "WARMUP") return { color: COLORS.green, label: "Warmup", glow: false };
+  if (subMode === "PREHEAT") return { color: COLORS.green, label: "Preheat", glow: false };
+  if (subMode === "STANDBY") return { color: COLORS.green, label: "Standby", glow: false };
 
   const action = state.attributes.hvac_action;
   if (action === "heating") return { color: COLORS.orange, label: null, glow: true };
