@@ -55,7 +55,7 @@ export function resolveAcPresentation(state, subModeState, autoSubModeState) {
       case "AUTO_HEAT":
         return { color: COLORS.orange, label: "Heating", glow: true };
       case "AUTO_COOL":
-        return { color: COLORS.teal, label: "Cooling", glow: true };
+        return { color: COLORS.ice, label: "Cooling", glow: true };
       case "AUTO_LEADER":
         return { color: COLORS.grey, label: "Auto (Leader)", glow: false };
       case "AUTO_ACTIVE":
@@ -75,7 +75,7 @@ export function resolveAcPresentation(state, subModeState, autoSubModeState) {
 
   const action = state.attributes.hvac_action;
   if (action === "heating") return { color: COLORS.orange, label: null, glow: true };
-  if (action === "cooling") return { color: COLORS.teal, label: null, glow: true };
+  if (action === "cooling") return { color: COLORS.ice, label: null, glow: true };
   if (action === "drying") return { color: COLORS.teal, label: null, glow: true };
   if (action === "fan") return { color: COLORS.green, label: null, glow: true };
   return { color: COLORS.grey, label: null, glow: false }; // idle / off
@@ -135,7 +135,7 @@ export class AcThermostatCard extends HTMLElement {
     // native defaults so off/fan/dry/cool keep their normal HA coloring
     // except where we deliberately want teal for cool+dry and green for fan.
     const modeColorOverrides = {
-      cool: COLORS.teal,
+      cool: COLORS.ice,
       dry: COLORS.teal,
       fan_only: COLORS.green,
     };

@@ -1,0 +1,169 @@
+# Mitsubishi AC Thermostat Card
+
+A Home Assistant Lovelace card for Mitsubishi heat pumps running the
+[`echavet/MitsubishiCN105ESPHome`](https://github.com/echavet/MitsubishiCN105ESPHome)
+ESPHome component. It wraps the native `thermostat` card rather than
+replacing it, and adds the CN105-specific presentation and controls that
+component doesn't ship with.
+
+| Heating | Cooling | Defrost |
+|---|---|---|
+| ![Heating](screenshots/heating.png) | ![Cooling](screenshots/cooling.png) | ![Defrost](screenshots/defrost.png) |
+
+## Why this exists
+
+The CN105 ESPHome component gives Home Assistant a real `climate` entity with
+correct modes, temperature, and `hvac_action` — but a few things it reports
+don't come through in the stock `thermostat` card, or in a form a human
+wants to read at a glance:
+
+- **Sub-modes report as sensors, not as card state.** CN105 exposes two
+  diagnostic text sensors, `sub_mode` (`NORMAL` / `DEFROST` / `WARMUP` /
+  `PREHEAT` / `STANDBY`) and `auto_sub_mode` (`AUTO_HEAT` / `AUTO_COOL` /
+  `AUTO_LEADER` / `AUTO_ACTIVE` / ...), that the native card has no way to
+  fold into its own coloring or label. Defrosting looks identical to
+  "heating normally" unless you go check a separate sensor.
+- **Fan speed labels are the component's internal enum, not what's printed
+  on the remote.** The native dropdown shows `auto` / `quiet` / `low` /
+  `medium` / `middle` / `high` in ESPHome's own declaration order — not the
+  unit's actual 1–5 speed numbering, and `middle` vs `medium` reads as a
+  typo rather than two different speeds.
+- **Vertical vane position has no UI at all in the stock setup.** CN105
+  exposes it as a `select` entity with its own 7 options, but nothing
+  surfaces it inside the thermostat card itself — it would otherwise need a
+  second, separate card underneath.
+
+This card fixes exactly those three things, without touching the real
+entity state anything else in Home Assistant sees: everything is read-only
+overrides of the native card's *presentation* for the one render cycle, plus
+a vane control that calls the entity's own `select.select_option` service
+like any other UI would.
+
+## What it does
+
+- **Wraps `type: thermostat`** (via `helpers.createCardElement`) instead of
+  reimplementing it, so it keeps every native behavior (header toolbar,
+  more-info, size/grid behavior, theming) for free. See
+  [Architecture](#architecture) for why.
+- **Colors and labels the dial from the real sub-mode sensors:**
+
+  | State | Color | Label override |
+  |---|---|---|
+  | `hvac_action: heating` | orange | — (native) |
+  | `hvac_action: cooling` / `cool` mode | blue | — (native) |
+  | `dry` mode / `hvac_action: drying` | teal | — (native) |
+  | `fan_only` mode / `hvac_action: fan` | green | — (native) |
+  | `sub_mode: DEFROST` | blue | "Defrost" |
+  | `sub_mode: WARMUP` | green | "Warmup" |
+  | `sub_mode: PREHEAT` | green | "Preheat" |
+  | `sub_mode: STANDBY` | green | "Standby" |
+  | `auto_sub_mode: AUTO_HEAT` | orange | "Heating" |
+  | `auto_sub_mode: AUTO_COOL` | blue | "Cooling" |
+  | `auto_sub_mode: AUTO_LEADER` / `AUTO_ACTIVE` | grey | "Auto (Leader)" / "Auto (Active)" |
+  | unavailable / unknown | grey | — |
+
+  Green is used for "the unit is actively operating but not yet delivering
+  heat or cold" (warmup/preheat/standby) — grey is reserved for genuinely
+  off/idle, so a glance at the color never confuses "working" with "doing
+  nothing." Defrost shares the cooling blue deliberately: the unit is
+  reverse-cycling exactly like active cooling, just for a different reason.
+
+- **Reorders and relabels the fan speed dropdown** to `Auto, 1, 2, 3, 4, 5`
+  — the same numbering printed on the physical remote — while the actual
+  service call underneath still sends CN105's real `fan_mode` string
+  (`quiet`, `middle`, etc.). Nothing about the entity changes; only what's
+  drawn in the dropdown.
+- **Adds a 7-position vertical vane control** inside the same card body
+  (not a second card), reusing HA's own `ha-control-select-menu` and swing
+  icon so it looks like a native feature row:
+
+  `Auto, 1 - Up, 2, 3, 4, 5 - Down, Swing`
+
+## Requirements
+
+- Home Assistant with the [`echavet/MitsubishiCN105ESPHome`](https://github.com/echavet/MitsubishiCN105ESPHome)
+  component (tested against CN105 component `2026.11.1`, ESPHome `2026.10.2`).
+- The `sub_mode` and `auto_sub_mode` diagnostic text sensors enabled (they're
+  disabled-by-default diagnostic entities — enable via the entity's settings).
+- A `select` entity for vertical vane position, if you want that row (the
+  card works without `vertical_vane_entity` configured — it just omits the row).
+
+## Installation
+
+Not distributed via HACS (see [Distribution](#distribution) below). Manual
+install:
+
+1. Copy `ac-thermostat-card.js` to `<config>/www/mitsubishi-ac-thermostat/`.
+2. Add it as a Lovelace resource:
+   ```yaml
+   resources:
+     - url: /local/mitsubishi-ac-thermostat/ac-thermostat-card.js
+       type: module
+   ```
+   (Or Settings → Dashboards → Resources in the UI.)
+3. Add the card to a dashboard:
+   ```yaml
+   type: custom:ac-thermostat-card
+   entity: climate.your_ac_entity
+   sub_mode_entity: sensor.your_ac_cn105_sub_mode
+   auto_sub_mode_entity: sensor.your_ac_cn105_auto_sub_mode
+   vertical_vane_entity: select.your_ac_cn105_vertical_vane   # optional
+   ```
+
+## Architecture
+
+The card never touches the real `climate` entity's state or attributes —
+Home Assistant's own automations, history graphs, voice assistants, etc.
+all see the unmodified entity exactly as CN105 reports it. All of the
+presentation logic works by:
+
+1. Setting CSS custom properties (`--state-climate-heat-color`, etc.) on the
+   wrapped native card, scoped to just that card instance.
+2. Monkey-patching the native temperature control's `render()` and
+   `_renderLabel()` methods for a single render pass, to substitute a label
+   or suppress the glow animation — then restoring normal rendering
+   immediately after.
+3. Reordering/relabeling the native fan-mode feature's already-rendered
+   `<ha-control-select-menu>` options in place (same `value`s, different
+   `label`s/order) after every hass update, since the native feature
+   redraws its own options from the entity's declared order on each render.
+4. Mounting one extra `<ha-control-select-menu>` as a light-DOM child of the
+   wrapped card's `<ha-card>`, so it renders inside the same card body via
+   `ha-card`'s own `<slot>` rather than as a second bordered card.
+
+This is the same pattern used by this household's other custom card
+(`heating_pulse_controller_v2/www/thermostat-card.js`, not public): wrap the
+native card, patch presentation surgically, never fork the whole component.
+
+### Known limitations
+
+- The native thermostat control's +/− step buttons only appear above a
+  container-query width threshold. Getting pixel-exact size parity with
+  sibling `thermostat` cards and the +/− buttons simultaneously wasn't
+  achievable without taking on brittle, viewport-dependent sizing hacks —
+  so this card currently **omits the +/− buttons** and matches sibling card
+  size instead. Revisit once more rooms run this card side-by-side.
+- DOM traversal into the native card's shadow tree
+  (`hui-thermostat-card` → `hui-card-features` → `hui-card-feature` →
+  `hui-climate-fan-modes-card-feature` → `ha-control-select-menu`) relies on
+  Home Assistant frontend internals, not a public API. A future HA frontend
+  refactor could silently break the fan-mode relabeling without an error.
+
+## Distribution
+
+Not published to HACS. Two reasons:
+
+1. **Vocabulary is CN105-specific, not generic.** `resolveAcPresentation()`
+   matches exact sub-mode strings this component emits (`DEFROST`,
+   `AUTO_HEAT`, `WARMUP`, ...), and the fan/vane label maps assume CN105's
+   exact enum/glyph values. A different Mitsubishi integration, or a
+   different vendor's component, would silently get no benefit from the
+   card's actual point — not broken, just dead weight.
+2. **No support commitment for strangers' setups.** This was built for one
+   household's specific entity layout and hasn't been exercised against
+   other CN105 installs, HA frontend versions, or dashboard configurations.
+
+If you're using the same component and want this anyway: HACS supports
+adding a private repo as a "custom repository" (Settings → integrations →
+HACS → ⋮ → Custom repositories) if you have access, or just follow
+[Installation](#installation) above directly.
