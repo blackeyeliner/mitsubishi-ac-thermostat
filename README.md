@@ -89,7 +89,7 @@ any other UI would.
 
 **Via HACS** (recommended):
 
-1. HACS → ⋮ → Custom repositories → add `https://github.com/blackeyeliner/mitsubishi-ac-thermostat`, category **Dashboard**.
+1. HACS → ⋮ → Custom repositories → add `https://github.com/blackeyeliner/mitsubishi-ac-thermostat`, category **Plugin**.
 2. Find "Mitsubishi AC Thermostat" in HACS and install it. HACS registers the
    Lovelace resource automatically.
 
