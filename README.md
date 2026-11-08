@@ -90,8 +90,13 @@ like any other UI would.
 
 ## Installation
 
-Not distributed via HACS (see [Distribution](#distribution) below). Manual
-install:
+**Via HACS** (recommended):
+
+1. HACS → ⋮ → Custom repositories → add `https://github.com/blackeyeliner/mitsubishi-ac-thermostat`, category **Dashboard**.
+2. Find "Mitsubishi AC Thermostat" in HACS and install it. HACS registers the
+   Lovelace resource automatically.
+
+**Manual install** (no HACS):
 
 1. Copy `ac-thermostat-card.js` to `<config>/www/mitsubishi-ac-thermostat/`.
 2. Add it as a Lovelace resource:
@@ -101,7 +106,8 @@ install:
        type: module
    ```
    (Or Settings → Dashboards → Resources in the UI.)
-3. Add the card to a dashboard:
+
+Then add the card to a dashboard:
    ```yaml
    type: custom:ac-thermostat-card
    entity: climate.your_ac_entity
@@ -137,33 +143,19 @@ native card, patch presentation surgically, never fork the whole component.
 
 ### Known limitations
 
-- The native thermostat control's +/− step buttons only appear above a
-  container-query width threshold. Getting pixel-exact size parity with
-  sibling `thermostat` cards and the +/− buttons simultaneously wasn't
-  achievable without taking on brittle, viewport-dependent sizing hacks —
-  so this card currently **omits the +/− buttons** and matches sibling card
-  size instead. Revisit once more rooms run this card side-by-side.
 - DOM traversal into the native card's shadow tree
   (`hui-thermostat-card` → `hui-card-features` → `hui-card-feature` →
   `hui-climate-fan-modes-card-feature` → `ha-control-select-menu`) relies on
   Home Assistant frontend internals, not a public API. A future HA frontend
   refactor could silently break the fan-mode relabeling without an error.
 
-## Distribution
+## Scope
 
-Not published to HACS. Two reasons:
-
-1. **Vocabulary is CN105-specific, not generic.** `resolveAcPresentation()`
-   matches exact sub-mode strings this component emits (`DEFROST`,
-   `AUTO_HEAT`, `WARMUP`, ...), and the fan/vane label maps assume CN105's
-   exact enum/glyph values. A different Mitsubishi integration, or a
-   different vendor's component, would silently get no benefit from the
-   card's actual point — not broken, just dead weight.
-2. **No support commitment for strangers' setups.** This was built for one
-   household's specific entity layout and hasn't been exercised against
-   other CN105 installs, HA frontend versions, or dashboard configurations.
-
-If you're using the same component and want this anyway: HACS supports
-adding a private repo as a "custom repository" (Settings → integrations →
-HACS → ⋮ → Custom repositories) if you have access, or just follow
-[Installation](#installation) above directly.
+Built for one household's [`echavet/MitsubishiCN105ESPHome`](https://github.com/echavet/MitsubishiCN105ESPHome)
+setup — `resolveAcPresentation()` matches that component's exact sub-mode
+strings (`DEFROST`, `AUTO_HEAT`, `WARMUP`, ...) and its fan/vane
+enum/glyph values. A different Mitsubishi integration, or a different
+vendor's component, won't get the sub-mode coloring or label fixes (it'll
+just render as a plain native thermostat card). Only exercised against
+this one installation so far — no support commitment beyond that, though
+issues/PRs are welcome.

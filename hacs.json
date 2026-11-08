@@ -1,0 +1,6 @@
+{
+  "name": "Mitsubishi AC Thermostat",
+  "filename": "ac-thermostat-card.js",
+  "content_in_root": true,
+  "render_readme": true
+}
