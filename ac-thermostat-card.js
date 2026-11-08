@@ -9,6 +9,18 @@
 const FAN_MODE_ORDER = ["auto", "quiet", "low", "medium", "middle", "high"];
 const FAN_MODE_LABELS = { auto: "Auto", quiet: "1", low: "2", medium: "3", middle: "4", high: "5" };
 
+// CN105 reports vane positions as arrow glyphs; show friendlier labels while
+// keeping the real glyph as the service-call value.
+const VANE_LABELS = {
+  AUTO: "Auto",
+  "↑↑": "1 - Up",
+  "↑": "2",
+  "—": "3",
+  "↓": "4",
+  "↓↓": "5 - Down",
+  SWING: "Swing",
+};
+
 // Same icon HA's native climate-swing-modes feature uses (mdi:arrow-up-down),
 // grabbed from the live rendered feature rather than guessed.
 const VANE_ICON_PATH =
@@ -178,7 +190,7 @@ export class AcThermostatCard extends HTMLElement {
     }
 
     this._vaneMenu.hass = this._hass;
-    this._vaneMenu.options = vaneState.attributes.options.map((o) => ({ label: o, value: o }));
+    this._vaneMenu.options = vaneState.attributes.options.map((o) => ({ label: VANE_LABELS[o] ?? o, value: o }));
     this._vaneMenu.value = vaneState.state;
     this._vaneMenu.disabled = ["unavailable", "unknown"].includes(vaneState.state);
   }
