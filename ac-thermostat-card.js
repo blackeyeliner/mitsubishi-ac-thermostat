@@ -85,14 +85,6 @@ export class AcThermostatCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    // Without this the host defaults to display:inline, which starves the
-    // native control's container-query width just enough to drop it from
-    // the "lg" size bucket to "md" — silently hiding its +/- step buttons.
-    // Must go through :host CSS, not this.style — custom element constructors
-    // are not allowed to add attributes (including `style`) to the host.
-    const hostStyle = document.createElement("style");
-    hostStyle.textContent = ":host { display: block; }";
-    this.shadowRoot.appendChild(hostStyle);
     this._generation = 0;
   }
 
@@ -118,19 +110,11 @@ export class AcThermostatCard extends HTMLElement {
       });
       if (generation !== this._generation) return;
       this._card = card;
-      // Leave the :host style tag from the constructor alone — only replace
-      // previous card/error content.
-      for (const child of [...this.shadowRoot.children]) {
-        if (child.tagName !== "STYLE") child.remove();
-      }
-      this.shadowRoot.appendChild(card);
+      this.shadowRoot.replaceChildren(card);
       if (this._hass) this.hass = this._hass;
     } catch (error) {
       if (generation !== this._generation) return;
-      for (const child of [...this.shadowRoot.children]) {
-        if (child.tagName !== "STYLE") child.remove();
-      }
-      this.shadowRoot.appendChild(document.createTextNode("Unable to load thermostat: " + error.message));
+      this.shadowRoot.textContent = "Unable to load thermostat: " + error.message;
     }
   }
 
@@ -259,6 +243,16 @@ export class AcThermostatCard extends HTMLElement {
     await control.updateComplete;
     if (card !== this._card || generation !== this._presentationGeneration) return;
 
+    // Our card mounts asynchronously (loadCardHelpers + several updateComplete
+    // awaits), which apparently lets the control's own size-bucket detection
+    // measure a transiently wider box than a synchronously-mounted native
+    // card gets — reliably landing one bucket larger ("lg" with +/- buttons
+    // instead of "md") even with identical ha-card width and feature count.
+    // Cap to the same ratio a 3-feature sibling card's control measures
+    // (245px control / 372.9px card ≈ 65.7%) so this stays visually
+    // consistent with the other AC cards instead of chasing the real cause.
+    control.style.maxWidth = "65.7%";
+
     // Surgical override of the native render, scoped to this control
     // instance only. Mirrors heating-pulse-controller-v2's pattern: fake the
     // rendered stateObj for the duration of one render() call so the arc
@@ -306,19 +300,16 @@ export class AcThermostatCard extends HTMLElement {
     control.requestUpdate();
   }
 
-  // The native card's own getCardSize/getGridOptions are computed from its
-  // configured features alone — they don't know about the display:block fix
-  // (which bumps it into the taller "lg" container-query bucket, adding the
-  // +/- buttons) or the extra vane row we append into its ha-card. Without
-  // correcting for that, the sections grid allocates too little height and
-  // the real content silently overflows into whatever sits below (confirmed:
-  // measured 553px rendered vs 440px allocated at the native rows value).
+  // The native card's own getCardSize/getGridOptions don't know about the
+  // extra vane row we append into its ha-card — without the +1 here, the
+  // sections grid allocates too little height and the real content silently
+  // overflows past its slot into the card below.
   getCardSize() {
-    return (this._card?.getCardSize?.() ?? 5) + 2;
+    return (this._card?.getCardSize?.() ?? 5) + 1;
   }
   getGridOptions() {
     const base = this._card?.getGridOptions?.() ?? { columns: 6, rows: 4 };
-    return { ...base, rows: base.rows + 2 };
+    return { ...base, rows: base.rows + 1 };
   }
   static getStubConfig(hass) {
     const entity = Object.values(hass.states).find(
