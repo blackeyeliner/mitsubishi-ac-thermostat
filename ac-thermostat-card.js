@@ -185,9 +185,15 @@ export class AcThermostatCard extends HTMLElement {
       icon.setAttribute("slot", "icon");
       icon.path = VANE_ICON_PATH;
       this._vaneMenu.appendChild(icon);
-      this._vaneMenu.addEventListener("value-changed", (ev) => {
-        this._hass.callService("select", "select_option", { entity_id: entity, option: ev.detail.value });
-      });
+      // Current frontends build this menu on a Web Awesome dropdown that fires
+      // `wa-select` (detail.item.value); older ones fired `value-changed`.
+      const select = (option) => {
+        if (option == null || option === this._hass.states[entity]?.state) return;
+        this._vaneMenu.value = option;
+        this._hass.callService("select", "select_option", { entity_id: entity, option });
+      };
+      this._vaneMenu.addEventListener("wa-select", (ev) => select(ev.detail?.item?.value));
+      this._vaneMenu.addEventListener("value-changed", (ev) => select(ev.detail?.value));
       this._vaneMenu.style.width = "100%";
       const wrapper = document.createElement("div");
       // ha-card is flex column/align-items:center, so a plain light-DOM child
